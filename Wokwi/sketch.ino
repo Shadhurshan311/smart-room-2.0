@@ -1,0 +1,133 @@
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include <DHT.h>
+#include <ESP32Servo.h>
+#include <Adafruit_NeoPixel.h>
+
+// ---------- WiFi ----------
+const char* ssid = "Wokwi-GUEST";
+const char* password = "";
+
+// ---------- MQTT ----------
+const char* mqtt_server = "test.mosquitto.org";
+
+// ---------- Pins ----------
+#define DHTPIN 15
+#define DHTTYPE DHT22
+#define SERVO_PIN 18      // Fan
+#define LED_PIN 2
+#define NEOPIXEL_PIN 4
+#define NUMPIXELS 16
+
+// ---------- Thresholds ----------
+float TEMP_LIMIT = 30.0;
+float HUM_LIMIT  = 70.0;
+
+// ---------- Objects ----------
+WiFiClient espClient;
+PubSubClient client(espClient);
+DHT dht(DHTPIN, DHTTYPE);
+Servo fanServo;
+Adafruit_NeoPixel pixels(NUMPIXELS, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
+
+// ---------- States ----------
+bool autoMode = true;
+bool fanState = false;
+
+// ---------- WiFi ----------
+void setup_wifi() {
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+  }
+}
+
+// ---------- MQTT Callback ----------
+void callback(char* topic, byte* payload, unsigned int length) {
+  String msg;
+  for (int i = 0; i < length; i++) msg += (char)payload[i];
+
+  // Mode
+  if (String(topic) == "room/mode") {
+    autoMode = (msg == "AUTO");
+  }
+
+  // Manual Fan
+  if (String(topic) == "room/fan" && !autoMode) {
+    fanState = (msg == "ON");
+    fanServo.write(fanState ? 180 : 0);
+  }
+
+  // LED
+  if (String(topic) == "room/led") {
+    digitalWrite(LED_PIN, msg == "ON");
+  }
+
+  // NeoPixel (RGB fixed for GRB)
+  if (String(topic) == "room/neopixel") {
+    int r = msg.substring(msg.indexOf("r")+2).toInt();
+    int g = msg.substring(msg.indexOf("g")+2).toInt();
+    int b = msg.substring(msg.indexOf("b")+2).toInt();
+
+    for (int i = 0; i < NUMPIXELS; i++) {
+      pixels.setPixelColor(i, pixels.Color(g, r, b)); // GRB FIX
+    }
+    pixels.show();
+  }
+}
+
+// ---------- MQTT Reconnect ----------
+void reconnect() {
+  while (!client.connected()) {
+    if (client.connect("ESP32_SmartRoom")) {
+      client.subscribe("room/mode");
+      client.subscribe("room/fan");
+      client.subscribe("room/led");
+      client.subscribe("room/neopixel");
+    } else {
+      delay(2000);
+    }
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(LED_PIN, OUTPUT);
+
+  dht.begin();
+  fanServo.attach(SERVO_PIN);
+  fanServo.write(0); // Fan OFF
+
+  pixels.begin();
+  pixels.clear();
+  pixels.show();
+
+  setup_wifi();
+  client.setServer(mqtt_server, 1883);
+  client.setCallback(callback);
+}
+
+void loop() {
+  if (!client.connected()) reconnect();
+  client.loop();
+
+  delay(2000);
+
+  float temp = dht.readTemperature();
+  float hum  = dht.readHumidity();
+
+  if (isnan(temp) || isnan(hum)) return;
+
+  client.publish("room/temperature", String(temp).c_str());
+  client.publish("room/humidity", String(hum).c_str());
+
+  // AUTO MODE Fan Control
+  if (autoMode) {
+    if (temp > TEMP_LIMIT || hum > HUM_LIMIT) {
+      fanServo.write(180);
+    } else {
+      fanServo.write(0);
+    }
+  }
+}

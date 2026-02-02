@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "author": "Anonymous maker",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 9.6, "left": -62.36, "attrs": {} },
+    { "type": "wokwi-led", "id": "led1", "top": 44.4, "left": 176.6, "attrs": { "color": "red" } },
+    { "type": "wokwi-dht22", "id": "dht1", "top": -86.1, "left": 109.8, "attrs": {} },
+    { "type": "wokwi-servo", "id": "servo1", "top": 238, "left": 124.8, "attrs": {} },
+    {
+      "type": "wokwi-led-ring",
+      "id": "ring1",
+      "top": -56.96,
+      "left": -296.41,
+      "attrs": { "pixels": "16" }
+    }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "led1:C", "esp:GND.3", "green", [ "v0" ] ],
+    [ "dht1:VCC", "esp:3V3", "red", [ "v9.6", "h-57.6", "v-67.2", "h-172.8", "v67.2" ] ],
+    [ "dht1:SDA", "esp:15", "green", [ "v0" ] ],
+    [ "dht1:GND", "esp:GND.3", "black", [ "v0" ] ],
+    [ "servo1:GND", "esp:GND.3", "black", [ "h-48", "v-192" ] ],
+    [ "servo1:V+", "esp:5V", "green", [ "h0" ] ],
+    [ "esp:18", "servo1:PWM", "green", [ "h28.8", "v192" ] ],
+    [ "esp:2", "led1:A", "green", [ "h182.4", "v-86.4" ] ],
+    [ "ring1:DIN", "esp:4", "green", [ "v144", "h326.4", "v-96" ] ],
+    [ "ring1:VCC", "esp:5V", "red", [ "v0" ] ],
+    [ "ring1:GND", "esp:GND.1", "black", [ "v0" ] ]
+  ],
+  "dependencies": {}
+}
